@@ -2,6 +2,7 @@ package bloomfilter
 
 import (
 	"encoding/binary"
+	"math"
 	"sync"
 )
 
@@ -42,6 +43,35 @@ func NewLocalBloomService(m int32, encryptor []Encryptor, isConcurrent bool) *Bl
 		encryptor:    encryptor,
 		isConcurrent: isConcurrent,
 	}
+}
+
+func (bf *BloomFilter) M() int32 {
+	return bf.m
+}
+
+func (bf *BloomFilter) N() int32 {
+	return bf.n
+}
+
+func (bf *BloomFilter) K() int32 {
+	return bf.k
+}
+
+// P = (1 - e^(-kn/m))^k , false positive probability
+func (bf *BloomFilter) P() float64 {
+	return math.Pow(1-math.Exp(float64(-bf.k*bf.n)/float64(bf.m)), float64(bf.k))
+}
+
+func (bf *BloomFilter) Bitmap() []int32 {
+	if bf.isConcurrent {
+		bf.RLock()
+		defer bf.RUnlock()
+	}
+
+	bitmap := make([]int32, len(bf.bitmap))
+	copy(bitmap, bf.bitmap)
+
+	return bitmap
 }
 
 func (bf *BloomFilter) Exist(val []byte) bool {

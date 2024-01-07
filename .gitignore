@@ -1,0 +1,5 @@
+go.sum*
+go_*
+.idea*
+*main
+go_build*

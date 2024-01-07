@@ -2,6 +2,8 @@ package bloomfilter
 
 import (
 	"encoding/binary"
+	"sync"
+	"sync/atomic"
 )
 
 type (
@@ -16,6 +18,10 @@ type (
 
 		// encryptor: encrypt data of type any to type int32
 		encryptor []Encryptor
+
+		// concurrent
+		isConcurrent bool
+		sync.RWMutex
 	}
 )
 
@@ -25,16 +31,17 @@ type (
 	}
 )
 
-func NewLocalBloomService(m int32, encryptor []Encryptor) *BloomFilter {
+func NewLocalBloomService(m int32, encryptor []Encryptor, isConcurrent bool) *BloomFilter {
 	if m <= 0 || len(encryptor) == 0 {
 		return nil
 	}
 
 	return &BloomFilter{
-		m:         m,
-		k:         int32(len(encryptor)),
-		bitmap:    make([]int32, m/32+1),
-		encryptor: encryptor,
+		m:            m,
+		k:            int32(len(encryptor)),
+		bitmap:       make([]int32, m/32+1),
+		encryptor:    encryptor,
+		isConcurrent: isConcurrent,
 	}
 }
 
@@ -43,7 +50,14 @@ func (bf *BloomFilter) Exist(val []byte) bool {
 		return false
 	}
 
-	for _, offset := range bf.getOffsets(val) {
+	offsets := bf.getOffsets(val)
+
+	if bf.isConcurrent {
+		bf.RLock()
+		defer bf.RUnlock()
+	}
+
+	for _, offset := range offsets {
 		if bf.bitmap[offset>>5]&(1<<(offset&31)) == 0 {
 			// bf.bitmap[offset / 32]&(1<<(offset % 32))
 			return false
@@ -54,11 +68,19 @@ func (bf *BloomFilter) Exist(val []byte) bool {
 }
 
 func (bf *BloomFilter) Set(val []byte) {
-	for _, offset := range bf.getOffsets(val) {
+	offsets := bf.getOffsets(val)
+
+	if bf.isConcurrent {
+		bf.Lock()
+		defer bf.Unlock()
+	}
+
+	for _, offset := range offsets {
 		// bf.bitmap[offset / 32] |= 1<<(offset % 32)
 		bf.bitmap[offset>>5] |= 1 << (offset & 31)
 	}
-	bf.n++
+
+	atomic.AddInt32(&bf.n, 1)
 }
 
 func (bf *BloomFilter) getOffsets(val []byte) []int32 {

@@ -46,19 +46,31 @@ func NewLocalBloomService(m int32, encryptor []Encryptor, isConcurrent bool) *Bl
 }
 
 func (bf *BloomFilter) M() int32 {
+	if bf == nil {
+		return 0
+	}
 	return bf.m
 }
 
 func (bf *BloomFilter) N() int32 {
+	if bf == nil {
+		return 0
+	}
 	return bf.n
 }
 
 func (bf *BloomFilter) K() int32 {
+	if bf == nil {
+		return 0
+	}
 	return bf.k
 }
 
 // P = (1 - e^(-kn/m))^k , false positive probability
 func (bf *BloomFilter) P() float64 {
+	if bf == nil {
+		return 0
+	}
 	return math.Pow(1-math.Exp(float64(-bf.k*bf.n)/float64(bf.m)), float64(bf.k))
 }
 

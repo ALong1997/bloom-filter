@@ -8,9 +8,9 @@ import (
 
 type (
 	BloomFilter struct {
-		// m：max number of bits
+		// m：the number of bits
 		// k：the number of encryptor
-		// n：the number of bits entered
+		// n：the number of inserted bits
 		m, k, n int32
 
 		// bitmap：len(bitmap) = m/32 + 1
@@ -31,7 +31,22 @@ type (
 	}
 )
 
-func NewLocalBloomService(m int32, encryptor []Encryptor, isConcurrent bool) *BloomFilter {
+// OptimalK calculates the optimal k value for creating a new Bloom filter
+// maxN is the maximum anticipated number of elements
+// optimal k = ceiling( m * ln2 / n )
+func OptimalK(m, maxN uint32) uint32 {
+	return uint32(math.Ceil(float64(m) * math.Ln2 / float64(maxN)))
+}
+
+// OptimalM calculates the optimal m value for creating a new Bloom filter
+// maxN is the maximum anticipated number of elements
+// p is the desired false positive probability
+// optimal m = ceiling( - n * ln(p) / (ln2)^2 )
+func OptimalM(maxN uint32, p float64) uint32 {
+	return uint32(math.Ceil(-float64(maxN) * math.Log(p) / math.Pow(math.Ln2, 2)))
+}
+
+func NewBloomFilter(m int32, encryptor []Encryptor, isConcurrent bool) *BloomFilter {
 	if m <= 0 || len(encryptor) == 0 {
 		return nil
 	}
@@ -66,7 +81,8 @@ func (bf *BloomFilter) K() int32 {
 	return bf.k
 }
 
-// P = (1 - e^(-kn/m))^k , false positive probability
+// P returns false positive probability
+// P = (1 - e^(-kn/m))^k
 func (bf *BloomFilter) P() float64 {
 	if bf == nil {
 		return 0

@@ -3,14 +3,13 @@ package bloomfilter
 import (
 	"encoding/binary"
 	"sync"
-	"sync/atomic"
 )
 
 type (
 	BloomFilter struct {
-		// m：max number of elements
+		// m：max number of bits
 		// k：the number of encryptor
-		// n：the number of elements entered
+		// n：the number of bits entered
 		m, k, n int32
 
 		// bitmap：len(bitmap) = m/32 + 1
@@ -39,7 +38,7 @@ func NewLocalBloomService(m int32, encryptor []Encryptor, isConcurrent bool) *Bl
 	return &BloomFilter{
 		m:            m,
 		k:            int32(len(encryptor)),
-		bitmap:       make([]int32, m/32+1),
+		bitmap:       make([]int32, m>>5+1),
 		encryptor:    encryptor,
 		isConcurrent: isConcurrent,
 	}
@@ -80,7 +79,20 @@ func (bf *BloomFilter) Set(val []byte) {
 		bf.bitmap[offset>>5] |= 1 << (offset & 31)
 	}
 
-	atomic.AddInt32(&bf.n, 1)
+	bf.n++
+}
+
+func (bf *BloomFilter) Reset() []int32 {
+	if bf.isConcurrent {
+		bf.Lock()
+		defer bf.Unlock()
+	}
+
+	oldBitmap := bf.bitmap
+	bf.bitmap = make([]int32, bf.m>>5+1)
+	bf.n = 0
+
+	return oldBitmap
 }
 
 func (bf *BloomFilter) getOffsets(val []byte) []int32 {

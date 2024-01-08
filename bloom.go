@@ -11,12 +11,12 @@ type (
 		// m：the number of bits
 		// k：the number of encryptor
 		// n：the number of inserted bits
-		m, k, n int32
+		m, k, n uint32
 
 		// bitmap：len(bitmap) = m/32 + 1
-		bitmap []int32
+		bitmap []uint32
 
-		// encryptor: encrypt data of type any to type int32
+		// encryptor: encrypt data of type any to type uint32
 		encryptor []Encryptor
 
 		// concurrent
@@ -27,7 +27,7 @@ type (
 
 type (
 	Encryptor interface {
-		Encrypt(origin []byte) int32
+		Encrypt(origin []byte) uint32
 	}
 )
 
@@ -46,35 +46,35 @@ func OptimalM(maxN uint32, p float64) uint32 {
 	return uint32(math.Ceil(-float64(maxN) * math.Log(p) / math.Pow(math.Ln2, 2)))
 }
 
-func NewBloomFilter(m int32, encryptor []Encryptor, isConcurrent bool) *BloomFilter {
-	if m <= 0 || len(encryptor) == 0 {
+func NewBloomFilter(m uint32, encryptor []Encryptor, isConcurrent bool) *BloomFilter {
+	if m == 0 || len(encryptor) == 0 {
 		return nil
 	}
 
 	return &BloomFilter{
 		m:            m,
-		k:            int32(len(encryptor)),
-		bitmap:       make([]int32, m>>5+1),
+		k:            uint32(len(encryptor)),
+		bitmap:       make([]uint32, m>>5+1),
 		encryptor:    encryptor,
 		isConcurrent: isConcurrent,
 	}
 }
 
-func (bf *BloomFilter) M() int32 {
+func (bf *BloomFilter) M() uint32 {
 	if bf == nil {
 		return 0
 	}
 	return bf.m
 }
 
-func (bf *BloomFilter) N() int32 {
+func (bf *BloomFilter) N() uint32 {
 	if bf == nil {
 		return 0
 	}
 	return bf.n
 }
 
-func (bf *BloomFilter) K() int32 {
+func (bf *BloomFilter) K() uint32 {
 	if bf == nil {
 		return 0
 	}
@@ -90,13 +90,13 @@ func (bf *BloomFilter) P() float64 {
 	return math.Pow(1-math.Exp(float64(-bf.k*bf.n)/float64(bf.m)), float64(bf.k))
 }
 
-func (bf *BloomFilter) Bitmap() []int32 {
+func (bf *BloomFilter) Bitmap() []uint32 {
 	if bf.isConcurrent {
 		bf.RLock()
 		defer bf.RUnlock()
 	}
 
-	bitmap := make([]int32, len(bf.bitmap))
+	bitmap := make([]uint32, len(bf.bitmap))
 	copy(bitmap, bf.bitmap)
 
 	return bitmap
@@ -140,26 +140,26 @@ func (bf *BloomFilter) Set(val []byte) {
 	bf.n++
 }
 
-func (bf *BloomFilter) Reset() []int32 {
+func (bf *BloomFilter) Reset() []uint32 {
 	if bf.isConcurrent {
 		bf.Lock()
 		defer bf.Unlock()
 	}
 
 	oldBitmap := bf.bitmap
-	bf.bitmap = make([]int32, bf.m>>5+1)
+	bf.bitmap = make([]uint32, bf.m>>5+1)
 	bf.n = 0
 
 	return oldBitmap
 }
 
-func (bf *BloomFilter) getOffsets(val []byte) []int32 {
+func (bf *BloomFilter) getOffsets(val []byte) []uint32 {
 	if bf == nil {
 		return nil
 	}
 
 	origin := val
-	var offsets = make([]int32, 0, bf.k)
+	var offsets = make([]uint32, 0, bf.k)
 	for _, e := range bf.encryptor {
 		offset := e.Encrypt(origin) % bf.m
 		offsets = append(offsets, offset)
